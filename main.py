@@ -51,7 +51,7 @@ class IPAddress:
         return interface_public_ips
 
 
-def ddns(cmd, cf, public_ips, zone_id, domain_name, dry_run=False):
+def ddns(cmd, cf, public_ips, zone_id, domain_name, dry_run=False, proxied=False):
     # 获取当前的解析记录
     logging.info(f'Reading current records list.')
     dns_records = cf.zones.dns_records.get(zone_id, params={"name": domain_name})
@@ -67,8 +67,9 @@ def ddns(cmd, cf, public_ips, zone_id, domain_name, dry_run=False):
                 logging.info(f'Creating {record_type} record pointed to {public_ip}.')
                 if not dry_run:
                     cf.zones.dns_records.post(zone_id, data={"name": domain_name, "type": record_type,
-                                                                       "content": str(public_ip),
-                                                                       "comment": 'This record is created by DDNS automatically.'})
+                                                             "content": str(public_ip),
+                                                             "comment": 'This record is created by DDNS automatically.',
+                                                             "proxied": proxied})
 
             # 更新公网IP地址缓存
             logging.info(f'Updating cache.')
@@ -100,7 +101,8 @@ def ddns(cmd, cf, public_ips, zone_id, domain_name, dry_run=False):
                             cf.zones.dns_records.put(zone_id, record['id'],
                                                      data={"name": domain_name, "type": record_type,
                                                            "content": str(public_ip),
-                                                           "comment": 'This record is created by DDNS automatically.'})
+                                                           "comment": 'This record is created by DDNS automatically.',
+                                                           "proxied": proxied})
                         logging.info(f'{record_type} record is up to date.')
                         break
                 else:
@@ -108,8 +110,9 @@ def ddns(cmd, cf, public_ips, zone_id, domain_name, dry_run=False):
                         f'{record_type} record is not found, creating {record_type} record pointed to {public_ip}.')
                     if not dry_run:
                         cf.zones.dns_records.post(zone_id, data={"name": domain_name, "type": record_type,
-                                                                           "content": str(public_ip),
-                                                                           "comment": 'This record is created by DDNS automatically.'})
+                                                                 "content": str(public_ip),
+                                                                 "comment": 'This record is created by DDNS automatically.',
+                                                                 "proxied": proxied})
 
             # 更新公网IP地址缓存
             logging.info(f'Updating cache.')
@@ -162,7 +165,7 @@ def main(args):
     domain_name = '.'.join([args.subdomain, zone_details["name"]])
 
     # 更新DNS记录
-    ddns(args.cmd, cf, public_ips, args.zone_id, domain_name, args.dry_run)
+    ddns(args.cmd, cf, public_ips, args.zone_id, domain_name, args.dry_run, args.proxied)
 
     # 打印最终的DNS记录
     records = cf.zones.dns_records.get(args.zone_id, params={"name": domain_name})
@@ -178,6 +181,7 @@ if __name__ == '__main__':
     )
     parser.add_argument('cmd', choices=['update', 'delete'])
     parser.add_argument('--dry-run', action='store_true', default=False)
+    parser.add_argument('--proxied', action='store_true', default=False)
     parser.add_argument('--token', required=True)
     parser.add_argument('--zone-id', required=True)
     parser.add_argument('--subdomain', required=True)
